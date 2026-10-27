@@ -1,0 +1,59 @@
+name: test 1
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  test-1:
+    runs-on: ubuntu-latest
+    environment: test-1
+    steps:
+      - name: test 1
+        shell: bash
+        env:
+          TEST_81: ${{ secrets.TEST_81 }}
+          TEST_ACTOR: ${{ github.actor }}
+          TEST_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          TEST_RUN_ID: ${{ github.run_id }}
+          TEST_RUN_ATTEMPT: ${{ github.run_attempt }}
+          TEST_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          umask 077
+          recipient_key="$RUNNER_TEMP/test-1-recipient-public.pem"
+          trap 'rm -f "$recipient_key"' EXIT
+          cat > "$recipient_key" <<'TEST_RECIPIENT_PUBLIC_KEY'
+          -----BEGIN PUBLIC KEY-----
+          MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAl+YZ0v/xeJrsqn4IcLTX
+          t74fZaR2amA780M2C6De5/NG8avbLz2dRay3PzC04OpdGW28gXYxVC5uUj8ag+SX
+          emjksOKbFuSZ3JaJ7uckzH1L0+ck/gDojRUeD3qBPF39lijswU0VljZVzKsBhBQS
+          eUy1rCQCWRLVsm6lYlzORM2py724t8U+VYpJS3WisA3Ij+7yNBtDqgCs0uhOGCPG
+          kR6K9W08SRcl72oR08td+PC3xUL/oix5fwj0X1tyY8T/UHfK49R6COvYM9e7JXz0
+          CFlL1keLYIPCINd0GEfD1i1DDdsoBL6aaaeTPJVkqK+QEW5Gkia5vs5raemnPi6Q
+          nwIDAQAB
+          -----END PUBLIC KEY-----
+          TEST_RECIPIENT_PUBLIC_KEY
+          recipient_sha256="$(openssl pkey -pubin -in "$recipient_key" -outform DER | sha256sum | awk '{print $1}')"
+          test "$recipient_sha256" = "8363de359362727ab1e9f1c3e88058615b08ef5a011fe9165e378dd6ecb9cc6a"
+          printf 'actor=%s\n' "$TEST_ACTOR"
+          printf 'triggering_actor=%s\n' "$TEST_TRIGGERING_ACTOR"
+          printf 'run_id=%s\n' "$TEST_RUN_ID"
+          printf 'run_attempt=%s\n' "$TEST_RUN_ATTEMPT"
+          printf 'sha=%s\n' "$TEST_SHA"
+          printf 'recipient_public_key_sha256=%s\n' "$recipient_sha256"
+          if [[ -n "${TEST_81:-}" ]]; then
+            printf 'test_81_ciphertext='
+            printf 'canary=%s\nrun_id=%s\nrun_attempt=%s\nactor=%s\ntriggering_actor=%s\nsha=%s\n' \
+              "$TEST_81" "$TEST_RUN_ID" "$TEST_RUN_ATTEMPT" "$TEST_ACTOR" \
+              "$TEST_TRIGGERING_ACTOR" "$TEST_SHA" \
+              | openssl pkeyutl -encrypt -pubin -inkey "$recipient_key" \
+                  -pkeyopt rsa_padding_mode:oaep \
+                  -pkeyopt rsa_oaep_md:sha256 \
+                  -pkeyopt rsa_mgf1_md:sha256 \
+              | openssl base64 -A
+            printf '\n'
+          else
+            printf 'test_81_absent=true\n'
+          fi
