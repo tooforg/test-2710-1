@@ -1,0 +1,21 @@
+name: test 2
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  test-2:
+    runs-on: ubuntu-latest
+    environment: test-1
+    steps:
+      - name: test 2
+        shell: bash
+        env:
+          TEST_ACTOR: ${{ github.actor }}
+          TEST_TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+        run: |
+          printf 'actor=%s\n' "$TEST_ACTOR"
+          printf 'triggering_actor=%s\n' "$TEST_TRIGGERING_ACTOR"
